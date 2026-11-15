@@ -97,7 +97,7 @@ function enviar() {
   const msg = 'Olá! Quero fazer este pedido:\n\n' + state.carrinho.map(i => `• ${i.nome} (${i.desc}): ${BRL(i.preco)}`).join('\n') + `\n\nTotal: ${BRL(total)}`;
   const wa = state.config.whatsapp.replace(/\D/g, '');
   if (!wa) { navigator.clipboard?.writeText(msg); return toast('WhatsApp não configurado. Pedido copiado.'); }
-  window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent(msg), '_blank');
+  window.open('https://wa.me/' + 19981796411 + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
 const varTexto = v => (v || []).map(g => g.nome + ': ' + g.valores.map(x => x.nome + (x.extra ? ' +' + x.extra : '')).join(', ')).join('\n');
