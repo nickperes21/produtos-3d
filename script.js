@@ -1,6 +1,14 @@
-/* Catálogo 3D — produtos, categorias e fotos ficam salvos no navegador (localStorage). */
+/* Catálogo 3D — produtos e categorias ficam no arquivo catalogo.json do seu repositório GitHub. */
 const ADMIN_PIN = '1234';            // TROQUE por uma senha sua (não use CPF nem dados pessoais).
 const WHATSAPP = '5519981796411';    // DDI 55 + DDD + número. Igual em todos os dispositivos.
+const REPO_MANUAL = '';   // Só preencha se NÃO usar endereço github.io. Ex.: 'meuusuario/meu-catalogo'
+const BRANCH = 'main';    // ramo do seu repositório
+const REPO = (() => {
+  if (REPO_MANUAL.includes('/')) { const [owner, repo] = REPO_MANUAL.split('/'); return { owner, repo }; }
+  const h = location.hostname;
+  if (h.endsWith('.github.io')) return { owner: h.split('.')[0], repo: location.pathname.split('/')[1] || h };
+  return null;
+})();
 const CATEGORIAS = ['Chaveiros', 'Decoração', 'Acessórios', 'Bonecos'];
 const CORES = {amarelo:'#f5d90a',roxo:'#8e5ad7',verde:'#2fb344','verde-água':'#2cc4a4',azul:'#2f7de1',vermelho:'#e03a3a',rosa:'#e8559b',preto:'#222',branco:'#f4f4f4',cinza:'#8a8f98',marrom:'#7a4a32',laranja:'#f28c28',dourado:'#d4a437'};
 
@@ -32,8 +40,8 @@ const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; 
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { toast('Sem espaço para salvar. Use menos fotos ou fotos menores.'); } };
 
 const state = {
-  produtos: load('c3d_produtos', PADRAO),
-  categorias: load('c3d_categorias', CATEGORIAS),
+  produtos: structuredClone(PADRAO),
+  categorias: [...CATEGORIAS], carregando: true,
   carrinho: load('c3d_carrinho', []),
   admin: sessionStorage.getItem('c3d_admin') === '1',
   cat: 'Todos', busca: '', ordem: 'def', atual: null, sel: [], fotosForm: []
@@ -71,7 +79,7 @@ function render() {
         <div class="cfoot"><span class="price">${temExtra(p) ? '<small>a partir de</small>' : ''}${BRL(p.preco)}</span>
         <button class="btn sm" data-abrir="${esc(p.id)}">Escolher</button></div></div>
       ${state.admin ? `<div class="cadmin"><button class="btn ghost sm" data-editar="${esc(p.id)}">Editar</button><button class="btn danger sm" data-excluir="${esc(p.id)}">Excluir</button></div>` : ''}
-    </article>`).join('') : '<p class="empty">Nenhum produto encontrado. Tente outra busca.</p>';
+    </article>`).join('') : `<p class="empty">${state.carregando ? 'Carregando produtos…' : 'Nenhum produto encontrado. Tente outra busca.'}</p>`;
   $('#cartCount').textContent = state.carrinho.length;
   $('#waLink').href = 'https://wa.me/' + WHATSAPP;
   const bar = $('#adminBar'); bar.hidden = !state.admin;
@@ -82,6 +90,7 @@ function render() {
     <button class="btn ghost sm" data-a="exp">Exportar backup</button>
     <button class="btn ghost sm" data-a="imp">Importar backup</button>
     <button class="btn ghost sm" data-a="reset">Restaurar catálogo inicial</button>
+    <button class="btn ghost sm" data-a="token">Trocar token do GitHub</button>
     <button class="btn ghost sm" data-a="sair">Sair do modo lojista</button>` : '';
 }
 
@@ -140,8 +149,8 @@ function desenharFotos() {
 }
 function reduzir(file) { // reduz a foto para caber no armazenamento
   return new Promise((ok, erro) => { const r = new FileReader(); r.onerror = erro; r.onload = () => { const im = new Image(); im.onerror = erro; im.onload = () => {
-    const s = Math.min(1, 640 / Math.max(im.width, im.height)), c = document.createElement('canvas');
-    c.width = im.width * s; c.height = im.height * s; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', .82)); };
+    const s = Math.min(1, 560 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+    c.width = im.width * s; c.height = im.height * s; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', .78)); };
     im.src = r.result; }; r.readAsDataURL(file); });
 }
 function salvarProduto() {
@@ -150,29 +159,30 @@ function salvarProduto() {
   delete p.img;
   if (p.id) state.produtos = state.produtos.map(x => x.id === p.id ? p : x);
   else { p.id = 'p' + Date.now().toString(36); state.produtos.push(p); }
-  save('c3d_produtos', state.produtos); dlg.close(); render(); toast('Produto salvo');
+  dlg.close(); render(); salvarTudo();
 }
 
 /* ---------- ações do lojista ---------- */
 function acaoAdmin(a) {
   if (a === 'novo') formProduto();
   else if (a === 'sair') { state.admin = false; sessionStorage.removeItem('c3d_admin'); render(); }
+  else if (a === 'token') { localStorage.removeItem('c3d_token'); pegarToken(); }
   else if (a === 'categoria') {
     const nome = (prompt('Nome da nova categoria:') || '').trim(); if (!nome) return;
     if (state.categorias.some(c => c.toLowerCase() === nome.toLowerCase())) return toast('Essa categoria já existe.');
-    state.categorias.push(nome); save('c3d_categorias', state.categorias); render(); toast('Categoria criada');
+    state.categorias.push(nome); render(); salvarTudo();
   }
   else if (a === 'delcat') {
     const nome = (prompt('Nome da categoria que quer remover:') || '').trim().toLowerCase(); if (!nome) return;
     const alvo = state.categorias.find(c => c.toLowerCase() === nome);
     if (!alvo) return toast('Categoria não encontrada.');
     if (state.produtos.some(p => p.cat === alvo)) return toast('Ainda há produtos nessa categoria. Mude ou exclua eles primeiro.');
-    state.categorias = state.categorias.filter(c => c !== alvo); save('c3d_categorias', state.categorias); render(); toast('Categoria removida');
+    state.categorias = state.categorias.filter(c => c !== alvo); render(); salvarTudo();
   }
   else if (a === 'reset') {
     if (!confirm('Voltar ao catálogo inicial? Seus produtos e categorias adicionados serão apagados.')) return;
     state.produtos = structuredClone(PADRAO); state.categorias = [...CATEGORIAS];
-    save('c3d_produtos', state.produtos); save('c3d_categorias', state.categorias); render();
+    render(); salvarTudo();
   }
   else if (a === 'exp') {
     const l = document.createElement('a');
@@ -185,11 +195,54 @@ function acaoAdmin(a) {
       try {
         const d = JSON.parse(await i.files[0].text()); if (!Array.isArray(d.produtos)) throw 0;
         state.produtos = d.produtos; if (Array.isArray(d.categorias)) state.categorias = d.categorias;
-        save('c3d_produtos', state.produtos); save('c3d_categorias', state.categorias); render(); toast('Backup importado');
+        render(); salvarTudo();
       } catch { toast('Arquivo de backup inválido'); }
     };
     i.click();
   }
+}
+
+/* ---------- publicar para todos os dispositivos (GitHub) ---------- */
+const b64 = s => { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(bin); };
+function pegarToken() {
+  let t = localStorage.getItem('c3d_token');
+  if (!t) {
+    t = (prompt('Cole o token do GitHub (ele fica guardado só neste aparelho):') || '').trim();
+    if (t) localStorage.setItem('c3d_token', t);
+  }
+  return t;
+}
+async function publicar(texto) {
+  if (!REPO) throw new Error('repositório não encontrado (preencha REPO_MANUAL)');
+  const t = pegarToken(); if (!t) throw new Error('sem token');
+  const url = `https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/catalogo.json`;
+  const h = { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' };
+  const falha = r => { if ([401, 403, 404].includes(r.status)) localStorage.removeItem('c3d_token'); return new Error('GitHub respondeu ' + r.status + ' (confira o token)'); };
+  let sha;
+  const g = await fetch(url + '?ref=' + BRANCH, { headers: h, cache: 'no-store' });
+  if (g.ok) sha = (await g.json()).sha; else if (g.status !== 404) throw falha(g);
+  const r = await fetch(url, { method: 'PUT', headers: h, body: JSON.stringify({ message: 'Atualiza catálogo', content: b64(texto), branch: BRANCH, sha }) });
+  if (!r.ok) throw falha(r);
+}
+async function salvarTudo() {
+  toast('Publicando…');
+  try {
+    await publicar(JSON.stringify({ produtos: state.produtos, categorias: state.categorias }));
+    toast('Publicado! Aparece para todos em 1 a 2 minutos.');
+  } catch (err) { toast('Não publicou: ' + err.message); }
+}
+async function carregar() {
+  try {
+    let dados = null;
+    const t = localStorage.getItem('c3d_token');
+    if (t && REPO) { // lojista: lê a versão mais recente direto do GitHub
+      const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/catalogo.json?ref=${BRANCH}`, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github.raw+json' }, cache: 'no-store' });
+      if (r.ok) dados = await r.json();
+    }
+    if (!dados) { const r = await fetch('catalogo.json', { cache: 'no-store' }); if (r.ok) dados = await r.json(); }
+    if (dados && Array.isArray(dados.produtos)) { state.produtos = dados.produtos; if (Array.isArray(dados.categorias)) state.categorias = dados.categorias; }
+  } catch { /* sem catalogo.json: usa os produtos iniciais */ }
+  state.carregando = false; render();
 }
 
 /* ---------- eventos ---------- */
@@ -219,7 +272,7 @@ document.addEventListener('click', e => {
   else if (q('data-rm')) { state.carrinho.splice(+d('data-rm'), 1); save('c3d_carrinho', state.carrinho); render(); abrirCarrinho(); }
   else if (q('data-enviar')) enviar();
   else if (q('data-editar')) formProduto(state.produtos.find(p => p.id === d('data-editar')));
-  else if (q('data-excluir')) { if (confirm('Excluir este produto?')) { state.produtos = state.produtos.filter(p => p.id !== d('data-excluir')); save('c3d_produtos', state.produtos); render(); } }
+  else if (q('data-excluir')) { if (confirm('Excluir este produto?')) { state.produtos = state.produtos.filter(p => p.id !== d('data-excluir')); render(); salvarTudo(); } }
   else if (q('data-salvar')) salvarProduto();
   else if (q('data-a')) acaoAdmin(d('data-a'));
   else if (t.closest('#btnAdmin')) {
@@ -241,3 +294,4 @@ document.addEventListener('input', e => {
 $('#search').addEventListener('input', e => { state.busca = e.target.value.toLowerCase().trim(); render(); });
 $('#sort').addEventListener('change', e => { state.ordem = e.target.value; render(); });
 render();
+carregar();
