@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo 3D | Chaveiros, decoração e acessórios impressos em 3D</title>
+<meta name="description" content="Chaveiros, acessórios e decoração impressos em 3D. Escolha cor e acessórios e peça pelo WhatsApp.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="nav">
+  <a class="logo" href="#topo"><span class="logo-mark"></span>Catálogo 3D</a>
+  <nav>
+    <a href="#produtos">Produtos</a>
+    <a href="#como-pedir">Como pedir</a>
+    <a href="#contato">Contato</a>
+  </nav>
+  <button class="cart-btn" id="btnCart" aria-label="Abrir pedido">Pedido <b id="cartCount">0</b></button>
+</header>
+
+<main id="topo">
+  <section class="hero">
+    <div class="hero-text">
+      <h1>Peças impressas em 3D, atendendo a sua nescessidade.</h1>
+      <p>Chaveiros, acessórios e decoração feitos camada por camada. Escolha as variações, monte seu pedido e finalize pelo WhatsApp.</p>
+      <div class="hero-cta"><a class="btn" href="#produtos">Ver produtos</a><a class="btn ghost" href="#como-pedir">Como pedir</a></div>
+    </div>
+    <div class="layers" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </section>
+
+  <section class="sec" id="produtos">
+    <div class="sec-head"><h2>Produtos</h2><p id="resultInfo"></p></div>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Buscar produto" aria-label="Buscar produto">
+      <select id="sort" aria-label="Ordenar">
+        <option value="def">Ordem do catálogo</option>
+        <option value="asc">Menor preço</option>
+        <option value="desc">Maior preço</option>
+        <option value="az">Nome (A–Z)</option>
+      </select>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="admin" id="adminBar" hidden></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section class="sec steps" id="como-pedir">
+    <div class="sec-head"><h2>Como pedir</h2></div>
+    <ol>
+      <li><b>Escolha o produto</b><span>Abra o item e selecione cor, modelo ou acessório.</span></li>
+      <li><b>Monte o pedido</b><span>Adicione quantos itens quiser e confira o total.</span></li>
+      <li><b>Envie pelo WhatsApp</b><span>O pedido segue pronto e combinamos pagamento e entrega.</span></li>
+    </ol>
+  </section>
+</main>
+
+<footer id="contato">
+  <div><b>Catálogo 3D</b><p>Produtos impressos em 3D sob encomenda.</p></div>
+  <div><a class="btn" id="waLink" href="#" target="_blank" rel="noopener">Falar no WhatsApp</a></div>
+  <button class="lojista" id="btnAdmin">Área do lojista</button>
+</footer>
+
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast" role="status"></div>
+<script src="script.js"></script>
+</body>
+</html>
