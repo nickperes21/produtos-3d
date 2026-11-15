@@ -1,5 +1,4 @@
 /* Catálogo 3D — produtos e categorias ficam no arquivo catalogo.json do seu repositório GitHub. */
-const ADMIN_PIN = '1234';            // TROQUE por uma senha sua (não use CPF nem dados pessoais).
 const WHATSAPP = '5519981796411';    // DDI 55 + DDD + número. Igual em todos os dispositivos.
 const REPO_MANUAL = '';   // Só preencha se NÃO usar endereço github.io. Ex.: 'meuusuario/meu-catalogo'
 const BRANCH = 'main';    // ramo do seu repositório
@@ -41,7 +40,7 @@ const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } cat
 
 const state = {
   produtos: structuredClone(PADRAO),
-  categorias: [...CATEGORIAS], carregando: true,
+  categorias: [...CATEGORIAS], carregando: true, acesso: null,
   carrinho: load('c3d_carrinho', []),
   admin: sessionStorage.getItem('c3d_admin') === '1',
   cat: 'Todos', busca: '', ordem: 'def', atual: null, sel: [], fotosForm: []
@@ -90,6 +89,7 @@ function render() {
     <button class="btn ghost sm" data-a="exp">Exportar backup</button>
     <button class="btn ghost sm" data-a="imp">Importar backup</button>
     <button class="btn ghost sm" data-a="reset">Restaurar catálogo inicial</button>
+    <button class="btn ghost sm" data-a="senha">Definir senha</button>
     <button class="btn ghost sm" data-a="token">Trocar token do GitHub</button>
     <button class="btn ghost sm" data-a="sair">Sair do modo lojista</button>` : '';
 }
@@ -165,7 +165,8 @@ function salvarProduto() {
 /* ---------- ações do lojista ---------- */
 function acaoAdmin(a) {
   if (a === 'novo') formProduto();
-  else if (a === 'sair') { state.admin = false; sessionStorage.removeItem('c3d_admin'); render(); }
+  else if (a === 'sair') { state.admin = false; sessionStorage.removeItem('c3d_admin'); localStorage.removeItem('c3d_token'); render(); }
+  else if (a === 'senha') definirSenha();
   else if (a === 'token') { localStorage.removeItem('c3d_token'); pegarToken(); }
   else if (a === 'categoria') {
     const nome = (prompt('Nome da nova categoria:') || '').trim(); if (!nome) return;
@@ -227,7 +228,7 @@ async function publicar(texto) {
 async function salvarTudo() {
   toast('Publicando…');
   try {
-    await publicar(JSON.stringify({ produtos: state.produtos, categorias: state.categorias }));
+    await publicar(JSON.stringify({ produtos: state.produtos, categorias: state.categorias, acesso: state.acesso }));
     toast('Publicado! Aparece para todos em 1 a 2 minutos.');
   } catch (err) { toast('Não publicou: ' + err.message); }
 }
@@ -240,9 +241,55 @@ async function carregar() {
       if (r.ok) dados = await r.json();
     }
     if (!dados) { const r = await fetch('catalogo.json', { cache: 'no-store' }); if (r.ok) dados = await r.json(); }
-    if (dados && Array.isArray(dados.produtos)) { state.produtos = dados.produtos; if (Array.isArray(dados.categorias)) state.categorias = dados.categorias; }
+    if (dados && Array.isArray(dados.produtos)) { state.produtos = dados.produtos; if (Array.isArray(dados.categorias)) state.categorias = dados.categorias; state.acesso = dados.acesso || null; }
   } catch { /* sem catalogo.json: usa os produtos iniciais */ }
   state.carregando = false; render();
+}
+
+/* ---------- entrada do lojista: senha que protege o token (criptografia no navegador) ---------- */
+const bytes = x => new TextEncoder().encode(x);
+const paraB64 = u => btoa(String.fromCharCode(...u));
+const deB64 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0));
+async function chave(senha, salt) {
+  const base = await crypto.subtle.importKey('raw', bytes(senha), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function trancar(token, senha) {
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const c = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await chave(senha, salt), bytes(token)));
+  return [paraB64(salt), paraB64(iv), paraB64(c)].join('.');
+}
+async function destrancar(blob, senha) {
+  const [salt, iv, c] = blob.split('.').map(deB64);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await chave(senha, salt), c));
+}
+async function entrarLojista() {
+  if (state.admin) return toast('Modo lojista já está ativo');
+  if (!REPO) return toast('Repositório não encontrado (veja REPO_MANUAL).');
+  if (state.carregando) return toast('Aguarde o catálogo carregar.');
+  let t = localStorage.getItem('c3d_token');
+  if (!t && state.acesso) {
+    const senha = prompt('Senha do lojista:'); if (!senha) return;
+    toast('Verificando…');
+    try { t = await destrancar(state.acesso, senha); } catch { return toast('Senha incorreta.'); }
+  }
+  if (!t) t = pegarToken(); // primeiro acesso: cola o token uma vez
+  if (!t) return toast('Token não informado.');
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}`, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    const d = r.ok ? await r.json() : null;
+    if (!d?.permissions?.push) throw 0;
+    localStorage.setItem('c3d_token', t);
+    state.admin = true; sessionStorage.setItem('c3d_admin', '1'); render(); toast('Modo lojista ativado'); $('#produtos').scrollIntoView();
+  } catch { localStorage.removeItem('c3d_token'); toast('Token inválido ou sem acesso a este repositório.'); }
+}
+async function definirSenha() {
+  const t = localStorage.getItem('c3d_token'); if (!t) return toast('Entre com o token primeiro.');
+  const s1 = prompt('Crie a senha do lojista (use 4 palavras ou 12+ caracteres):'); if (!s1) return;
+  if (s1.length < 10) return toast('Senha curta demais: use pelo menos 10 caracteres.');
+  if (prompt('Digite a senha de novo para confirmar:') !== s1) return toast('As senhas não conferem.');
+  toast('Protegendo… (pode levar alguns segundos)');
+  state.acesso = await trancar(t, s1); salvarTudo();
 }
 
 /* ---------- eventos ---------- */
@@ -275,11 +322,7 @@ document.addEventListener('click', e => {
   else if (q('data-excluir')) { if (confirm('Excluir este produto?')) { state.produtos = state.produtos.filter(p => p.id !== d('data-excluir')); render(); salvarTudo(); } }
   else if (q('data-salvar')) salvarProduto();
   else if (q('data-a')) acaoAdmin(d('data-a'));
-  else if (t.closest('#btnAdmin')) {
-    if (state.admin) return toast('Modo lojista já está ativo');
-    if (prompt('Senha do lojista:') === ADMIN_PIN) { state.admin = true; sessionStorage.setItem('c3d_admin', '1'); render(); toast('Modo lojista ativado'); $('#produtos').scrollIntoView(); }
-    else toast('Senha incorreta');
-  }
+  else if (t.closest('#btnAdmin')) entrarLojista();
 });
 document.addEventListener('change', async e => {
   if (e.target.id !== 'fImg') return;
