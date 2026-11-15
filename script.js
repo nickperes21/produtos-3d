@@ -275,13 +275,21 @@ async function entrarLojista() {
   }
   if (!t) t = pegarToken(); // primeiro acesso: cola o token uma vez
   if (!t) return toast('Token não informado.');
+  let st = 0;
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}`, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    st = r.status;
     const d = r.ok ? await r.json() : null;
-    if (!d?.permissions?.push) throw 0;
+    if (!d || (d.permissions && !d.permissions.push)) throw 0;
     localStorage.setItem('c3d_token', t);
     state.admin = true; sessionStorage.setItem('c3d_admin', '1'); render(); toast('Modo lojista ativado'); $('#produtos').scrollIntoView();
-  } catch { localStorage.removeItem('c3d_token'); toast('Token inválido ou sem acesso a este repositório.'); }
+  } catch {
+    localStorage.removeItem('c3d_token');
+    toast(st === 401 ? 'Token inválido ou expirado (erro 401).'
+      : st === 404 ? `Este token não enxerga o repositório "${REPO.owner}/${REPO.repo}" (erro 404).`
+      : st === 200 ? 'Este token não tem permissão para editar.'
+      : st ? `GitHub respondeu erro ${st}.` : 'Sem conexão com o GitHub.');
+  }
 }
 async function definirSenha() {
   const t = localStorage.getItem('c3d_token'); if (!t) return toast('Entre com o token primeiro.');
