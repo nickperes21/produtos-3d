@@ -1,5 +1,6 @@
 /* Catálogo 3D — dados salvos no navegador (localStorage). */
 const ADMIN_PIN = '45622960894'; // TROQUE esta senha. Protege apenas a edição neste navegador.
+const WHATSAPP = '5519981796411';
 const CATEGORIAS = ['Chaveiros', 'Decoração', 'Acessórios', 'Bonecos'];
 const CORES = {amarelo:'#f5d90a',roxo:'#8e5ad7',verde:'#2fb344','verde-água':'#2cc4a4',azul:'#2f7de1',vermelho:'#e03a3a',rosa:'#e8559b',preto:'#222',branco:'#f4f4f4',cinza:'#8a8f98',marrom:'#7a4a32',laranja:'#f28c28',dourado:'#d4a437'};
 
@@ -70,7 +71,7 @@ function render() {
       ${state.admin ? `<div class="cadmin"><button class="btn ghost sm" data-editar="${esc(p.id)}">Editar</button><button class="btn danger sm" data-excluir="${esc(p.id)}">Excluir</button></div>` : ''}
     </article>`).join('') : '<p class="empty">Nenhum produto encontrado. Tente outra busca.</p>';
   $('#cartCount').textContent = state.carrinho.length;
-  const wa = state.config.whatsapp.replace(/\D/g, '');
+  const wa = WHATSAPP.replace(;
   $('#waLink').href = wa ? 'https://wa.me/' + wa : '#';
   const bar = $('#adminBar'); bar.hidden = !state.admin;
   bar.innerHTML = state.admin ? `<button class="btn sm" data-a="novo">Novo produto</button><button class="btn ghost sm" data-a="categoria">+ nova categoria</button><button class="btn ghost sm" data-a="delcat">- remover categoria</button><button class="btn ghost sm" data-a="wa">WhatsApp: ${esc(state.config.whatsapp || 'definir')}</button><button class="btn ghost sm" data-a="exp">Exportar backup</button><button class="btn ghost sm" data-a="imp">Importar backup</button><button class="btn ghost sm" data-a="reset">Restaurar catálogo inicial</button><button class="btn ghost sm" data-a="sair">Sair do modo lojista</button>` : '';
