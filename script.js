@@ -104,7 +104,7 @@ function abrirProduto(id) {
     <div class="big" id="foto" style="background-color:${esc(p.cor)};${capa(p) ? `background-image:url('${esc(capa(p))}')` : ''}">${capa(p) ? '' : esc(p.emoji)}</div>
     ${fotos.length > 1 ? `<div class="miniaturas">${fotos.map((f, i) => `<button class="mini" data-foto="${i}" style="background-image:url('${esc(f.src)}')" aria-label="Foto ${i + 1}"></button>`).join('')}</div>` : ''}
     <h2>${esc(p.nome)}</h2>
-    ${p.variacoes.map((g, i) => `<div class="grp"><b>${esc(g.nome)}</b><div class="opts">${g.valores.map((v, j) => `<button class="opt" aria-pressed="${j === 0}" data-g="${i}" data-v="${j}">${CORES[v.nome.toLowerCase()] ? `<span class="dot" style="background:${CORES[v.nome.toLowerCase()]}"></span>` : ''}${esc(v.nome)}${v.extra ? ` <small>+${BRL(v.extra)}</small>` : ''}</button>`).join('')}</div></div>`).join('')}
+    ${p.variacoes.map((g, i) => `<div class="grp"><b>${esc(g.nome)}</b><div class="opts">${g.valores.map((v, j) => `<button class="opt" aria-pressed="${j === 0}" data-g="${i}" data-v="${j}">${CORES[v.nome.toLowerCase()] ? `<span class="dot" style="background:${CORES[v.nome.toLowerCase()]}"></span>` : ''}${esc(v.nome)}</button>`).join('')}</div></div>`).join('')}
     <div><label for="obs">Observações (nome, texto, logo)</label><textarea id="obs" rows="2" placeholder="Opcional"></textarea></div>
     <div class="row"><span class="price" id="pAtual">${BRL(precoAtual())}</span><button class="btn" data-add>Adicionar ao pedido</button><button class="btn ghost" data-fechar>Fechar</button></div></div>`;
   dlg.showModal();
