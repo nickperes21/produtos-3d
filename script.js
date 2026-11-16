@@ -17,18 +17,6 @@ const grupo = (nome, lista) => ({ nome, valores: lista.split(',').map(t => {
 }) });
 const COR7 = 'Amarelo, Roxo, Verde-água, Azul, Rosa, Preto, Branco';
 const PADRAO = [
-  {id:'p1',nome:'chaveiro polvo',cat:'Chaveiros',preco:7,emoji:'🐙',cor:'#6b46c1',variacoes:[grupo('Cor',COR7),grupo('Acessório','Argola padrão, Mosquetão +3')]},
-  {id:'p2',nome:'chaveiro suporte de celular',cat:'Chaveiros',preco:7,emoji:'📱',cor:'#2f6fcf',variacoes:[grupo('Cor','Azul, Cinza, Preto, Roxo'),grupo('Acessório','Com argola, Sem argola')]},
-  {id:'p3',nome:'chaveiro giratório de time',cat:'Chaveiros',preco:7,emoji:'⚽',cor:'#1f7a4a',variacoes:[grupo('Time','Corinthians, Palmeiras, São Paulo, Santos, Flamengo')]},
-  {id:'p4',nome:'chaveiro de cruz',cat:'Chaveiros',preco:5,emoji:'✝️',cor:'#7a4a32',variacoes:[grupo('Cor','Marrom e branco, Preto e branco, Azul e branco')]},
-  {id:'p5',nome:'chaveiro de dragão flexível',cat:'Chaveiros',preco:7,emoji:'🐉',cor:'#2f86b8',variacoes:[grupo('Cor','Azul, Verde-água, Roxo, Vermelho, Dourado')]},
-  {id:'p6',nome:'abridor de refri de esmalte + nfc',cat:'Chaveiros',preco:10,emoji:'💅',cor:'#c23f80',variacoes:[grupo('Cor','Rosa, Preto, Roxo, Vermelho')]},
-  {id:'p7',nome:'chaveiro mídia social com aproximação nfc',cat:'Chaveiros',preco:10,emoji:'📲',cor:'#3a3f38',variacoes:[grupo('Rede','Instagram, WhatsApp, TikTok, Facebook, YouTube'),grupo('Cor','Preto e branco, Preto e dourado')]},
-  {id:'p8',nome:'chaveiro personalizado com logo e nfc',cat:'Chaveiros',preco:10,emoji:'🏷️',cor:'#6b6f68',variacoes:[grupo('Formato','Redondo, Quadrado'),grupo('Cor','Branco, Preto')]},
-  {id:'p9',nome:'dispensador de palito de dente',cat:'Acessórios',preco:20,emoji:'🪥',cor:'#a33636',variacoes:[grupo('Cor','Preto e vermelho, Preto, Branco')]},
-  {id:'p10',nome:'kit bandeja de natal',cat:'Decoração',preco:55,emoji:'🎄',cor:'#b03a2e',variacoes:[grupo('Embalagem','Normal, Para presente +5')]},
-  {id:'p11',nome:'suporte controle ps5 reforçado',cat:'Acessórios',preco:20,emoji:'🎮',cor:'#34406b',variacoes:[grupo('Cor','Branco, Preto')]},
-  {id:'p12',nome:'suporte de fone para monitor',cat:'Acessórios',preco:15,emoji:'🎧',cor:'#2d332c',variacoes:[grupo('Cor','Preto, Branco, Cinza')]}
 ];
 
 /* ---------- utilidades ---------- */
