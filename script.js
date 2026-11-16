@@ -269,9 +269,12 @@ async function entrarLojista() {
   if (state.carregando) return toast('Aguarde o catálogo carregar.');
   let t = localStorage.getItem('c3d_token');
   if (!t && state.acesso) {
-    const senha = prompt('Senha do lojista:'); if (!senha) return;
-    toast('Verificando…');
-    try { t = await destrancar(state.acesso, senha); } catch { return toast('Senha incorreta.'); }
+    const senha = prompt('Senha do lojista (ou deixe em branco para colar um token novo do GitHub):');
+    if (senha === null) return;
+    if (senha) {
+      toast('Verificando…');
+      try { t = await destrancar(state.acesso, senha); } catch { return toast('Senha incorreta.'); }
+    }
   }
   if (!t) t = pegarToken(); // primeiro acesso: cola o token uma vez
   if (!t) return toast('Token não informado.');
