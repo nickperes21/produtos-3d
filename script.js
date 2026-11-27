@@ -17,6 +17,18 @@ const grupo = (nome, lista) => ({ nome, valores: lista.split(',').map(t => {
 }) });
 const COR7 = 'Amarelo, Roxo, Verde-água, Azul, Rosa, Preto, Branco';
 const PADRAO = [
+  {id:'p1',nome:'chaveiro polvo',cat:'Chaveiros',preco:7,emoji:'🐙',cor:'#6b46c1',variacoes:[grupo('Cor',COR7),grupo('Acessório','Argola padrão, Mosquetão +3')]},
+  {id:'p2',nome:'chaveiro suporte de celular',cat:'Chaveiros',preco:7,emoji:'📱',cor:'#2f6fcf',variacoes:[grupo('Cor','Azul, Cinza, Preto, Roxo'),grupo('Acessório','Com argola, Sem argola')]},
+  {id:'p3',nome:'chaveiro giratório de time',cat:'Chaveiros',preco:7,emoji:'⚽',cor:'#1f7a4a',variacoes:[grupo('Time','Corinthians, Palmeiras, São Paulo, Santos, Flamengo')]},
+  {id:'p4',nome:'chaveiro de cruz',cat:'Chaveiros',preco:5,emoji:'✝️',cor:'#7a4a32',variacoes:[grupo('Cor','Marrom e branco, Preto e branco, Azul e branco')]},
+  {id:'p5',nome:'chaveiro de dragão flexível',cat:'Chaveiros',preco:7,emoji:'🐉',cor:'#2f86b8',variacoes:[grupo('Cor','Azul, Verde-água, Roxo, Vermelho, Dourado')]},
+  {id:'p6',nome:'abridor de refri de esmalte + nfc',cat:'Chaveiros',preco:10,emoji:'💅',cor:'#c23f80',variacoes:[grupo('Cor','Rosa, Preto, Roxo, Vermelho')]},
+  {id:'p7',nome:'chaveiro mídia social com aproximação nfc',cat:'Chaveiros',preco:10,emoji:'📲',cor:'#3a3f38',variacoes:[grupo('Rede','Instagram, WhatsApp, TikTok, Facebook, YouTube'),grupo('Cor','Preto e branco, Preto e dourado')]},
+  {id:'p8',nome:'chaveiro personalizado com logo e nfc',cat:'Chaveiros',preco:10,emoji:'🏷️',cor:'#6b6f68',variacoes:[grupo('Formato','Redondo, Quadrado'),grupo('Cor','Branco, Preto')]},
+  {id:'p9',nome:'dispensador de palito de dente',cat:'Acessórios',preco:20,emoji:'🪥',cor:'#a33636',variacoes:[grupo('Cor','Preto e vermelho, Preto, Branco')]},
+  {id:'p10',nome:'kit bandeja de natal',cat:'Decoração',preco:55,emoji:'🎄',cor:'#b03a2e',variacoes:[grupo('Embalagem','Normal, Para presente +5')]},
+  {id:'p11',nome:'suporte controle ps5 reforçado',cat:'Acessórios',preco:20,emoji:'🎮',cor:'#34406b',variacoes:[grupo('Cor','Branco, Preto')]},
+  {id:'p12',nome:'suporte de fone para monitor',cat:'Acessórios',preco:15,emoji:'🎧',cor:'#2d332c',variacoes:[grupo('Cor','Preto, Branco, Cinza')]}
 ];
 
 /* ---------- utilidades ---------- */
@@ -30,6 +42,7 @@ const state = {
   produtos: structuredClone(PADRAO),
   categorias: [...CATEGORIAS], carregando: true, acesso: null,
   carrinho: load('c3d_carrinho', []),
+  calculos: load('c3d_calculos', []), calcAtual: '',
   admin: sessionStorage.getItem('c3d_admin') === '1',
   cat: 'Todos', busca: '', ordem: 'def', atual: null, sel: [], fotosForm: []
 };
@@ -52,17 +65,17 @@ function mostrarFoto(src) {
 
 /* ---------- lista de produtos ---------- */
 function render() {
-  const cats = ['Todos', ...new Set([...state.categorias, ...state.produtos.map(p => p.cat).filter(Boolean)])];
+  const cats = ['Todos', ...new Set([...state.categorias, ...state.produtos.flatMap(p => [p.cat, p.cat2]).filter(Boolean)])];
   if (!cats.includes(state.cat)) state.cat = 'Todos';
   $('#chips').innerHTML = cats.map(c => `<button class="chip" aria-pressed="${c === state.cat}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
-  const lista = state.produtos.filter(p => (state.cat === 'Todos' || p.cat === state.cat) && p.nome.toLowerCase().includes(state.busca));
+  const lista = state.produtos.filter(p => (state.cat === 'Todos' || p.cat === state.cat || p.cat2 === state.cat) && p.nome.toLowerCase().includes(state.busca));
   if (state.ordem === 'asc') lista.sort((a, b) => a.preco - b.preco);
   if (state.ordem === 'desc') lista.sort((a, b) => b.preco - a.preco);
   if (state.ordem === 'az') lista.sort((a, b) => a.nome.localeCompare(b.nome));
   $('#resultInfo').textContent = lista.length + (lista.length === 1 ? ' produto' : ' produtos');
   $('#grid').innerHTML = lista.length ? lista.map(p => `
     <article class="card">${thumb(p, 'thumb')}
-      <div class="cbody"><span class="cat">${esc(p.cat)}</span><h3>${esc(p.nome)}</h3>
+      <div class="cbody"><span class="cat">${esc(p.cat)}${p.cat2 ? ' • ' + esc(p.cat2) : ''}</span><h3>${esc(p.nome)}</h3>
         <div class="cfoot"><span class="price">${temExtra(p) ? '<small>a partir de</small>' : ''}${BRL(p.preco)}</span>
         <button class="btn sm" data-abrir="${esc(p.id)}">Escolher</button></div></div>
       ${state.admin ? `<div class="cadmin"><button class="btn ghost sm" data-editar="${esc(p.id)}">Editar</button><button class="btn danger sm" data-excluir="${esc(p.id)}">Excluir</button></div>` : ''}
@@ -72,6 +85,7 @@ function render() {
   const bar = $('#adminBar'); bar.hidden = !state.admin;
   bar.innerHTML = state.admin ? `
     <button class="btn sm" data-a="novo">Novo produto</button>
+    <button class="btn sm" data-a="calc">Calculadora</button>
     <button class="btn ghost sm" data-a="categoria">+ nova categoria</button>
     <button class="btn ghost sm" data-a="delcat">- remover categoria</button>
     <button class="btn ghost sm" data-a="exp">Exportar backup</button>
@@ -123,7 +137,12 @@ function formProduto(p) {
   dlg.innerHTML = `<div class="dlg"><h2>${novo ? 'Novo produto' : 'Editar produto'}</h2>
     <div><label>Nome</label><input id="fNome" value="${esc(p.nome)}"></div>
     <div class="row"><div style="flex:1"><label>Categoria</label><select id="fCat">${cats.map(c => `<option ${c === p.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
-    <div style="flex:1"><label>Preço base (R$)</label><input id="fPreco" type="number" step="0.5" min="0" value="${esc(p.preco)}"></div></div>
+    <div style="flex:1"><label>Categoria 2 (opcional)</label><select id="fCat2"><option value="">— nenhuma —</option>${cats.map(c => `<option ${c === p.cat2 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div></div>
+    <div><label>Preencher com um cálculo salvo na calculadora</label><select id="fCalc"><option value="">— escolher —</option>${state.calculos.map(c => `<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('')}</select></div>
+    <div class="row"><div style="flex:1"><label>Custo (R$)</label><input id="fCusto" type="number" step="0.01" min="0" inputmode="decimal"></div>
+    <div style="flex:1"><label>Markup (%)</label><input id="fMk" type="number" step="1" min="0" inputmode="decimal"></div>
+    <div style="flex:1"><label>Preço base (R$)</label><input id="fPreco" type="number" step="0.01" min="0" inputmode="decimal" value="${esc(p.preco)}"></div></div>
+    <p style="margin:0;color:var(--mu);font-size:13px">Custo e markup só ajudam a calcular o preço e não são publicados. O que vale é o preço base.</p>
     <div class="row"><div style="flex:1"><label>Emoji (sem foto)</label><input id="fEmoji" value="${esc(p.emoji)}"></div>
     <div style="flex:1"><label>Cor de fundo</label><input id="fCor" type="color" value="${esc(p.cor)}" style="height:44px;padding:3px"></div></div>
     <div><label>Fotos do produto (pode escolher várias)</label><input id="fImg" type="file" accept="image/*" multiple><div id="fFotos"></div></div>
@@ -143,7 +162,7 @@ function reduzir(file) { // reduz a foto para caber no armazenamento
 }
 function salvarProduto() {
   const nome = $('#fNome').value.trim(); if (!nome) return toast('Informe o nome do produto.');
-  const p = { ...state.atual, nome, cat: $('#fCat').value, preco: parseFloat($('#fPreco').value) || 0, emoji: $('#fEmoji').value || '📦', cor: $('#fCor').value, variacoes: varParse($('#fVar').value), fotos: state.fotosForm };
+  const p = { ...state.atual, nome, cat: $('#fCat').value, cat2: $('#fCat2').value === $('#fCat').value ? '' : $('#fCat2').value, preco: parseFloat($('#fPreco').value) || 0, emoji: $('#fEmoji').value || '📦', cor: $('#fCor').value, variacoes: varParse($('#fVar').value), fotos: state.fotosForm };
   delete p.img;
   if (p.id) state.produtos = state.produtos.map(x => x.id === p.id ? p : x);
   else { p.id = 'p' + Date.now().toString(36); state.produtos.push(p); }
@@ -153,6 +172,7 @@ function salvarProduto() {
 /* ---------- ações do lojista ---------- */
 function acaoAdmin(a) {
   if (a === 'novo') formProduto();
+  else if (a === 'calc') abrirCalculadora();
   else if (a === 'sair') { state.admin = false; sessionStorage.removeItem('c3d_admin'); localStorage.removeItem('c3d_token'); render(); }
   else if (a === 'senha') definirSenha();
   else if (a === 'token') { localStorage.removeItem('c3d_token'); pegarToken(); }
@@ -165,7 +185,7 @@ function acaoAdmin(a) {
     const nome = (prompt('Nome da categoria que quer remover:') || '').trim().toLowerCase(); if (!nome) return;
     const alvo = state.categorias.find(c => c.toLowerCase() === nome);
     if (!alvo) return toast('Categoria não encontrada.');
-    if (state.produtos.some(p => p.cat === alvo)) return toast('Ainda há produtos nessa categoria. Mude ou exclua eles primeiro.');
+    if (state.produtos.some(p => p.cat === alvo || p.cat2 === alvo)) return toast('Ainda há produtos nessa categoria. Mude ou exclua eles primeiro.');
     state.categorias = state.categorias.filter(c => c !== alvo); render(); salvarTudo();
   }
   else if (a === 'reset') {
@@ -175,7 +195,7 @@ function acaoAdmin(a) {
   }
   else if (a === 'exp') {
     const l = document.createElement('a');
-    l.href = URL.createObjectURL(new Blob([JSON.stringify({ produtos: state.produtos, categorias: state.categorias }, null, 1)], { type: 'application/json' }));
+    l.href = URL.createObjectURL(new Blob([JSON.stringify({ produtos: state.produtos, categorias: state.categorias, calculos: state.calculos }, null, 1)], { type: 'application/json' }));
     l.download = 'catalogo-3d-backup.json'; l.click();
   }
   else if (a === 'imp') {
@@ -184,11 +204,48 @@ function acaoAdmin(a) {
       try {
         const d = JSON.parse(await i.files[0].text()); if (!Array.isArray(d.produtos)) throw 0;
         state.produtos = d.produtos; if (Array.isArray(d.categorias)) state.categorias = d.categorias;
+        if (Array.isArray(d.calculos)) { state.calculos = d.calculos; save('c3d_calculos', state.calculos); }
         render(); salvarTudo();
       } catch { toast('Arquivo de backup inválido'); }
     };
     i.click();
   }
+}
+
+/* ---------- calculadora de custo e markup (fica salva só neste aparelho, pois custo não deve ser público) ---------- */
+const precoDe = (custo, mk) => Math.round(custo * (1 + mk / 100) * 100) / 100;
+function recalcForm() {
+  const c = parseFloat($('#fCusto').value), m = parseFloat($('#fMk').value);
+  if (c >= 0 && m >= 0) $('#fPreco').value = precoDe(c, m).toFixed(2);
+}
+function atualizarCalc() {
+  const c = parseFloat($('#cCusto').value), m = parseFloat($('#cMk').value), o = $('#cOut');
+  if (!o) return;
+  if (!(c >= 0) || !(m >= 0)) { o.innerHTML = ''; return; }
+  const v = precoDe(c, m), l = v - c;
+  o.innerHTML = `<div><b>${BRL(v)}</b><span>Preço de venda</span></div><div><b>${BRL(l)}</b><span>Lucro</span></div><div><b>${v ? (l / v * 100).toFixed(1).replace('.', ',') : '0'}%</b><span>Margem</span></div>`;
+}
+function abrirCalculadora(c) {
+  c = c || { id: '', nome: '', custo: '', markup: 100 };
+  state.calcAtual = c.id;
+  dlg.innerHTML = `<div class="dlg"><h2>Calculadora</h2>
+    <div><label>Nome do produto (ex.: chaveiro polvo)</label><input id="cNome" value="${esc(c.nome)}"></div>
+    <div class="row"><div style="flex:1"><label>Custo (R$)</label><input id="cCusto" type="number" step="0.01" min="0" inputmode="decimal" value="${esc(c.custo)}"></div>
+    <div style="flex:1"><label>Markup (%)</label><input id="cMk" type="number" step="1" min="0" inputmode="decimal" value="${esc(c.markup)}"></div></div>
+    <div class="calc-out" id="cOut"></div>
+    <div class="row"><button class="btn" data-csalvar>Salvar cálculo</button><button class="btn ghost" data-fechar>Fechar</button></div>
+    <h3>Cálculos salvos</h3>
+    ${state.calculos.length ? state.calculos.map(x => `<div class="csalvo"><div><b>${esc(x.nome)}</b><span>Custo ${BRL(x.custo)} • Markup ${esc(x.markup)}% → ${BRL(precoDe(x.custo, x.markup))}</span></div><div class="row"><button class="btn ghost sm" data-cabrir="${esc(x.id)}">Abrir</button><button class="btn danger sm" data-cdel="${esc(x.id)}">Excluir</button></div></div>`).join('') : '<p style="color:var(--mu)">Nenhum cálculo salvo ainda.</p>'}</div>`;
+  if (!dlg.open) dlg.showModal();
+  atualizarCalc();
+}
+function salvarCalculo() {
+  const nome = $('#cNome').value.trim(), custo = parseFloat($('#cCusto').value), markup = parseFloat($('#cMk').value);
+  if (!nome) return toast('Dê um nome ao cálculo.');
+  if (!(custo >= 0) || !(markup >= 0)) return toast('Informe o custo e o markup.');
+  const c = state.calculos.find(x => x.id === state.calcAtual) || state.calculos.find(x => x.nome.toLowerCase() === nome.toLowerCase());
+  if (c) Object.assign(c, { nome, custo, markup }); else state.calculos.push({ id: 'c' + Date.now().toString(36), nome, custo, markup });
+  save('c3d_calculos', state.calculos); abrirCalculadora(); toast('Cálculo salvo');
 }
 
 /* ---------- publicar para todos os dispositivos (GitHub) ---------- */
@@ -320,10 +377,14 @@ document.addEventListener('click', e => {
   else if (q('data-editar')) formProduto(state.produtos.find(p => p.id === d('data-editar')));
   else if (q('data-excluir')) { if (confirm('Excluir este produto?')) { state.produtos = state.produtos.filter(p => p.id !== d('data-excluir')); render(); salvarTudo(); } }
   else if (q('data-salvar')) salvarProduto();
+  else if (q('data-csalvar')) salvarCalculo();
+  else if (q('data-cabrir')) abrirCalculadora(state.calculos.find(c => c.id === d('data-cabrir')));
+  else if (q('data-cdel')) { state.calculos = state.calculos.filter(c => c.id !== d('data-cdel')); save('c3d_calculos', state.calculos); abrirCalculadora(); }
   else if (q('data-a')) acaoAdmin(d('data-a'));
   else if (t.closest('#btnAdmin')) entrarLojista();
 });
 document.addEventListener('change', async e => {
+  if (e.target.id === 'fCalc') { const c = state.calculos.find(x => x.id === e.target.value); if (c) { $('#fCusto').value = c.custo; $('#fMk').value = c.markup; recalcForm(); } return; }
   if (e.target.id !== 'fImg') return;
   for (const file of e.target.files) {
     try { state.fotosForm.push({ src: await reduzir(file), opcao: '' }); } catch { toast('Não consegui ler uma das imagens.'); }
@@ -331,6 +392,8 @@ document.addEventListener('change', async e => {
   e.target.value = ''; desenharFotos();
 });
 document.addEventListener('input', e => {
+  if (e.target.id === 'fCusto' || e.target.id === 'fMk') recalcForm();
+  if (e.target.id === 'cCusto' || e.target.id === 'cMk') atualizarCalc();
   if (e.target.dataset.fop !== undefined) state.fotosForm[+e.target.dataset.fop].opcao = e.target.value;
 });
 $('#search').addEventListener('input', e => { state.busca = e.target.value.toLowerCase().trim(); render(); });
