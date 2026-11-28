@@ -27,13 +27,14 @@ const normalizar = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,''
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { toast('Sem espaço para salvar. Use menos fotos ou fotos menores.'); } };
 
-localStorage.removeItem('c3d_token'); // remove credencial persistente legada
+try { localStorage.removeItem('c3d_token'); sessionStorage.removeItem('c3d_token'); sessionStorage.removeItem('c3d_admin'); } catch {}
+let adminToken = '';
 const state = {
   produtos: structuredClone(PADRAO),
   categorias: [...CATEGORIAS], carregando: true, acesso: null,
   carrinho: load('c3d_carrinho', []),
   calculos: load('c3d_calculos2', []), calcPadrao: load('c3d_calcpadrao', {}), calcAtual: '',
-  admin: sessionStorage.getItem('c3d_admin') === '1' && !!sessionStorage.getItem('c3d_token'),
+  admin: false,
   cat: 'Todos', busca: '', ordem: 'def', atual: null, sel: [], fotosForm: []
 };
 const dlg = $('#dlg');
@@ -164,9 +165,9 @@ function salvarProduto() {
 function acaoAdmin(a) {
   if (a === 'novo') formProduto();
   else if (a === 'calc') abrirCalculadora();
-  else if (a === 'sair') { state.admin = false; sessionStorage.removeItem('c3d_admin'); sessionStorage.removeItem('c3d_token'); render(); }
-  else if (a === 'senha') toast('Use um token restrito ao repositório.');
-  else if (a === 'token') { sessionStorage.removeItem('c3d_token'); pegarToken(); }
+  else if (a === 'sair') { state.admin = false; adminToken = ''; render(); }
+  
+  else if (a === 'token') { state.admin=false; adminToken=''; render(); entrarLojista(); }
   else if (a === 'categoria') {
     const nome = (prompt('Nome da nova categoria:') || '').trim(); if (!nome) return;
     if (state.categorias.some(c => c.toLowerCase() === nome.toLowerCase())) return toast('Essa categoria já existe.');
@@ -277,20 +278,12 @@ function salvarCalculo() {
 
 /* ---------- publicar para todos os dispositivos (GitHub) ---------- */
 const b64 = s => { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(bin); };
-function pegarToken() {
-  let t = sessionStorage.getItem('c3d_token');
-  if (!t) {
-    t = (prompt('Cole o token do GitHub (ele fica guardado apenas nesta sessão):') || '').trim();
-    if (t) sessionStorage.setItem('c3d_token', t);
-  }
-  return t;
-}
 async function publicar(texto) {
   if (!REPO) throw new Error('repositório não encontrado (preencha REPO_MANUAL)');
-  const t = pegarToken(); if (!t) throw new Error('sem token');
+  const t = adminToken; if (!state.admin || !t) throw new Error('Entre na área do lojista');
   const url = `https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/catalogo.json`;
   const h = { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' };
-  const falha = r => { if ([401, 403, 404].includes(r.status)) sessionStorage.removeItem('c3d_token'); return new Error('GitHub respondeu ' + r.status + ' (confira o token)'); };
+  const falha = r => { if ([401, 403, 404].includes(r.status)) { adminToken=''; state.admin=false; render(); } return new Error('GitHub respondeu ' + r.status + ' (confira o token)'); };
   let sha;
   const g = await fetch(url + '?ref=' + BRANCH, { headers: h, cache: 'no-store' });
   if (g.ok) sha = (await g.json()).sha; else if (g.status !== 404) throw falha(g);
@@ -307,7 +300,7 @@ async function salvarTudo() {
 async function carregar() {
   try {
     let dados = null;
-    const t = sessionStorage.getItem('c3d_token');
+    const t = adminToken;
     if (t && REPO) { // lojista: lê a versão mais recente direto do GitHub
       const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/catalogo.json?ref=${BRANCH}`, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github.raw+json' }, cache: 'no-store' });
       if (r.ok) dados = await r.json();
@@ -318,66 +311,29 @@ async function carregar() {
   state.carregando = false; render();
 }
 
-/* ---------- entrada do lojista: senha que protege o token (criptografia no navegador) ---------- */
-const bytes = x => new TextEncoder().encode(x);
-const paraB64 = u => btoa(String.fromCharCode(...u));
-const deB64 = x => Uint8Array.from(atob(x), c => c.charCodeAt(0));
-async function chave(senha, salt) {
-  const base = await crypto.subtle.importKey('raw', bytes(senha), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 600000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
-}
-async function trancar(token, senha) {
-  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
-  const c = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await chave(senha, salt), bytes(token)));
-  return [paraB64(salt), paraB64(iv), paraB64(c)].join('.');
-}
-async function destrancar(blob, senha) {
-  const [salt, iv, c] = blob.split('.').map(deB64);
-  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await chave(senha, salt), c));
-}
+/* ---------- entrada do lojista ---------- */
 async function entrarLojista() {
   if (state.admin) return toast('Modo lojista já está ativo');
-  if (!REPO) return toast('Repositório não encontrado (veja REPO_MANUAL).');
-  if (state.carregando) return toast('Aguarde o catálogo carregar.');
-  let t = sessionStorage.getItem('c3d_token');
-  if (!t && state.acesso) {
-    const senha = prompt('Senha do lojista (ou deixe em branco para colar um token novo do GitHub):');
-    if (senha === null) return;
-    if (senha) {
-      toast('Verificando…');
-      try { t = await destrancar(state.acesso, senha); } catch { return toast('Senha incorreta.'); }
-    }
-  }
-  if (!t) t = pegarToken(); // primeiro acesso: cola o token uma vez
-  if (!t) return toast('Token não informado.');
-  let st = 0;
+  if (!REPO || state.carregando) return toast('Aguarde o catálogo carregar.');
+  const t = (prompt('Token GitHub restrito a este repositório, com Contents: Read and write:') || '').trim();
+  if (!t) return;
   try {
-    const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}`, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' }, cache: 'no-store' });
-    st = r.status;
+    const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}`, {headers:{Authorization:'Bearer '+t,Accept:'application/vnd.github+json'},cache:'no-store'});
     const d = r.ok ? await r.json() : null;
-    if (!d || (d.permissions && !d.permissions.push)) throw 0;
-    sessionStorage.setItem('c3d_token', t);
-    state.admin = true; sessionStorage.setItem('c3d_admin', '1'); render(); toast('Modo lojista ativado'); $('#produtos').scrollIntoView();
-  } catch {
-    sessionStorage.removeItem('c3d_token');
-    toast(st === 401 ? 'Token inválido ou expirado (erro 401).'
-      : st === 404 ? `Este token não enxerga o repositório "${REPO.owner}/${REPO.repo}" (erro 404).`
-      : st === 200 ? 'Este token não tem permissão para editar.'
-      : st ? `GitHub respondeu erro ${st}.` : 'Sem conexão com o GitHub.');
-  }
-}
-async function definirSenha() {
-  const t = sessionStorage.getItem('c3d_token'); if (!t) return toast('Entre com o token primeiro.');
-  const s1 = prompt('Crie a senha do lojista (use 4 palavras ou 12+ caracteres):'); if (!s1) return;
-  if (s1.length < 10) return toast('Senha curta demais: use pelo menos 10 caracteres.');
-  if (prompt('Digite a senha de novo para confirmar:') !== s1) return toast('As senhas não conferem.');
-  toast('Protegendo… (pode levar alguns segundos)');
-  state.acesso = await trancar(t, s1); salvarTudo();
+    if (!d || !d.permissions?.push) throw new Error('Sem permissão de escrita');
+    const data = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/catalogo.json?ref=${BRANCH}`,{headers:{Authorization:'Bearer '+t,Accept:'application/vnd.github.raw+json'},cache:'no-store'});
+    if (!data.ok) throw new Error('Não foi possível verificar o catálogo');
+    const catalogo=await data.json();
+    if(!Array.isArray(catalogo.produtos)) throw new Error('Catálogo inválido');
+    state.produtos=catalogo.produtos;
+    if(Array.isArray(catalogo.categorias)) state.categorias=catalogo.categorias;
+    adminToken=t; state.admin=true; render(); toast('Modo lojista ativado');
+  } catch(err) { adminToken=''; state.admin=false; render(); toast('Acesso negado: '+err.message); }
 }
 
 /* ---------- eventos ---------- */
 document.addEventListener('click', e => {
-  const t = e.target, q = a => t.closest(`[${a}]`), d = a => q(a)?.getAttribute(a);
+  const t = e.target; if (!state.admin && t.closest('[data-editar],[data-excluir],[data-salvar],[data-a],[data-csalvar],[data-cdel]')) return; const q = a => t.closest(`[${a}]`), d = a => q(a)?.getAttribute(a);
   if (t === dlg) return dlg.close();
   if (q('data-cat')) { state.cat = d('data-cat'); render(); }
   else if (q('data-foto')) mostrarFoto(fotosDe(state.atual)[+d('data-foto')].src);
