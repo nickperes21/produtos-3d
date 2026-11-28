@@ -238,7 +238,10 @@ function lerCalc() {
 }
 function atualizarCalc() {
   const o = $('#cOut'); if (!o) return;
-  const r = calcular(lerCalc()), caixa = (v, t) => `<div><b>${v}</b><span>${t}</span></div>`;
+  const c = lerCalc(), r = calcular(c), caixa = (v, t) => `<div><b>${v}</b><span>${t}</span></div>`;
+  $('#cEnergia').textContent = BRL(r.energia);
+  $('#cConsumo').textContent = `${(num(c.potencia)*num(c.tempo)/1000).toLocaleString('pt-BR',{maximumFractionDigits:4})} kWh`;
+  $('#cMaterial').textContent = BRL(r.material);
   o.innerHTML = caixa(BRL(r.total), 'Custo total') + caixa(BRL(r.un), 'Custo unitário') + caixa(BRL(r.preco), 'Preço consumidor')
     + caixa(BRL(r.lojista), 'Preço lojista') + caixa(BRL(r.bruto), 'Lucro bruto') + caixa(BRL(r.liquido), 'Lucro líquido')
     + caixa(BRL(r.brutoL), 'Lucro bruto lojista') + caixa(BRL(r.liquidoL), 'Lucro líq. lojista')
@@ -249,13 +252,13 @@ function abrirCalculadora(c) {
   c = c || { id: '', nome: '', acess: [{ nome: '', qtd: 1, custo: '' }], ...state.calcPadrao };
   state.calcAtual = c.id || '';
   const f = (id, label, val) => `<div style="flex:1;min-width:0"><label>${label}</label><input id="${id}" type="number" step="any" min="0" inputmode="decimal" value="${esc(val ?? '')}"></div>`;
-  const linhas = (c.acess?.length ? c.acess : [{ nome: '', qtd: 1, custo: '' }]).map((a, i) => `<div class="ac-row"><input class="ac-n" placeholder="Item (ex.: embalagem)" value="${esc(a.nome)}"><input class="ac-q" type="number" step="any" min="0" inputmode="decimal" placeholder="Qtd" value="${esc(a.qtd)}"><input class="ac-c" type="number" step="any" min="0" inputmode="decimal" placeholder="R$ un." value="${esc(a.custo)}"><button class="btn danger sm" data-cacdel="${i}" aria-label="Remover item">×</button></div>`).join('');
+  const linhas = (c.acess || []).map((a, i) => `<div class="ac-row"><input class="ac-n" placeholder="Item (ex.: embalagem)" value="${esc(a.nome)}"><input class="ac-q" type="number" step="any" min="0" inputmode="decimal" placeholder="Qtd" value="${esc(a.qtd)}"><input class="ac-c" type="number" step="any" min="0" inputmode="decimal" placeholder="R$ un." value="${esc(a.custo)}"><button class="btn danger sm" data-cacdel="${i}" aria-label="Remover item">×</button></div>`).join('');
   dlg.innerHTML = `<div class="dlg"><h2>Calculadora</h2><div id="cForm" style="display:flex;flex-direction:column;gap:12px">
-    <div><label>Modelo (nome do produto)</label><input id="cNome" value="${esc(c.nome)}" placeholder="ex.: suporte controle ps5"></div>
-    <div class="row">${f('cTempo', 'Tempo (horas)', c.tempo)}${f('cPeso', 'Peso (g)', c.peso)}${f('cUnid', 'Unidades', c.unid ?? 1)}</div>
-    <h3 class="calc-sec">Matéria-prima</h3><div class="row">${f('cKg', 'Custo do filamento por kg (R$)', c.kg)}</div>
-    <h3 class="calc-sec">Impressora e energia</h3><div class="row">${f('cPot', 'Potência (W)', c.potencia)}${f('cKwh', 'Custo do kWh (R$)', c.kwh)}</div>
-    <h3 class="calc-sec">Acessórios e embalagens</h3>${linhas}<div><button class="btn ghost sm" data-cadd>+ item</button></div>
+    <div><label>Nome do produto</label><input id="cNome" value="${esc(c.nome)}" placeholder="ex.: suporte controle ps5"></div>
+    <div class="row">${f('cTempo', 'Horas de impressão (total)', c.tempo)}${f('cPeso', 'Gramas (total)', c.peso)}${f('cUnid', 'Unidades', c.unid ?? 1)}</div>
+    <h3 class="calc-sec">Filamento</h3><div class="row">${f('cKg', 'Custo do filamento por kg (R$)', c.kg)}</div><div class="calc-out"><div><b id="cMaterial">—</b><span>Custo do filamento utilizado</span></div></div>
+    <h3 class="calc-sec">Impressora e energia</h3><div class="row">${f('cPot', 'Consumo médio da impressora (W)', c.potencia)}${f('cKwh', 'Tarifa de energia (R$/kWh)', c.kwh)}</div><div class="calc-out" aria-live="polite"><div><b id="cConsumo">—</b><span>Energia consumida</span></div><div><b id="cEnergia">—</b><span>Custo de energia</span></div></div><small style="color:var(--mu)">Watts ÷ 1.000 × horas × tarifa do kWh</small>
+    <h3 class="calc-sec">Acessórios e embalagens</h3>${linhas}<div><button class="btn ghost sm" data-cadd>+ Adicionar acessório ou embalagem</button></div>
     <h3 class="calc-sec">Custo fixo</h3><div class="row">${f('cFixo', 'Custo fixo mensal (R$)', c.fixoMes)}${f('cUnidMes', 'Unidades por mês', c.unidMes ?? 1)}</div>
     <h3 class="calc-sec">Máquina e falhas</h3><div class="row">${f('cVida', 'Vida útil (horas)', c.vida)}${f('cMaq', 'Valor da máquina (R$)', c.maquina)}${f('cFalhas', '% de falhas', c.falhas)}</div>
     <h3 class="calc-sec">Precificação</h3><div class="row">${f('cMk', 'Markup (×)', c.markup)}${f('cImp', 'Imposto (%)', c.imposto)}</div>
