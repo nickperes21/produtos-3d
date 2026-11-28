@@ -22,7 +22,8 @@ const PADRAO = [
 /* ---------- utilidades ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const BRL = n => 'R$ ' + Number(n).toFixed(2).replace('.', ',');
+const BRL = n => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n));
+const normalizar = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { toast('Sem espaço para salvar. Use menos fotos ou fotos menores.'); } };
 
@@ -56,7 +57,7 @@ function render() {
   const cats = ['Todos', ...new Set([...state.categorias, ...state.produtos.flatMap(p => [p.cat, p.cat2]).filter(Boolean)])];
   if (!cats.includes(state.cat)) state.cat = 'Todos';
   $('#chips').innerHTML = cats.map(c => `<button class="chip" aria-pressed="${c === state.cat}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
-  const lista = state.produtos.filter(p => (state.cat === 'Todos' || p.cat === state.cat || p.cat2 === state.cat) && p.nome.toLowerCase().includes(state.busca));
+  const lista = state.produtos.filter(p => (state.cat === 'Todos' || p.cat === state.cat || p.cat2 === state.cat) && normalizar(p.nome + ' ' + p.cat + ' ' + (p.cat2 || '')).includes(normalizar(state.busca)));
   if (state.ordem === 'asc') lista.sort((a, b) => a.preco - b.preco);
   if (state.ordem === 'desc') lista.sort((a, b) => b.preco - a.preco);
   if (state.ordem === 'az') lista.sort((a, b) => a.nome.localeCompare(b.nome));
@@ -109,7 +110,7 @@ function abrirCarrinho() {
 function enviar() {
   const total = state.carrinho.reduce((s, i) => s + i.preco, 0);
   const msg = 'Olá! Quero fazer este pedido:\n\n' + state.carrinho.map(i => `• ${i.nome} (${i.desc}): ${BRL(i.preco)}`).join('\n') + `\n\nTotal: ${BRL(total)}`;
-  window.open('https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(msg), '_blank');
+  window.open('https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
 }
 
 /* ---------- formulário do lojista ---------- */
@@ -150,6 +151,7 @@ function reduzir(file) { // reduz a foto para caber no armazenamento
 }
 function salvarProduto() {
   const nome = $('#fNome').value.trim(); if (!nome) return toast('Informe o nome do produto.');
+  if (!$('#fPreco').value || !Number.isFinite(Number($('#fPreco').value)) || Number($('#fPreco').value)<0) return toast('Informe um preço válido.');
   const p = { ...state.atual, nome, cat: $('#fCat').value, cat2: $('#fCat2').value === $('#fCat').value ? '' : $('#fCat2').value, preco: parseFloat($('#fPreco').value) || 0, emoji: $('#fEmoji').value || '📦', cor: $('#fCor').value, variacoes: varParse($('#fVar').value), fotos: state.fotosForm };
   delete p.img;
   if (p.id) state.produtos = state.produtos.map(x => x.id === p.id ? p : x);
@@ -178,6 +180,7 @@ function acaoAdmin(a) {
   }
   else if (a === 'reset') {
     if (!confirm('Voltar ao catálogo inicial? Seus produtos e categorias adicionados serão apagados.')) return;
+    if (!confirm('O catálogo inicial está vazio. Confirma apagar todos os produtos?')) return;
     state.produtos = structuredClone(PADRAO); state.categorias = [...CATEGORIAS];
     render(); salvarTudo();
   }
@@ -207,17 +210,17 @@ const PADROES = ['kg', 'potencia', 'kwh', 'fixoMes', 'unidMes', 'vida', 'maquina
 function calcular(c) {
   const tempo = num(c.tempo);
   const material = num(c.peso) / 1000 * num(c.kg);
-  const energia = num(c.potencia) * tempo * 0.5 * num(c.kwh) / 1000;
+  const energia = num(c.potencia) * tempo * num(c.kwh) / 1000;
   const acess = (c.acess || []).reduce((t, a) => t + num(a.qtd) * num(a.custo), 0);
-  const fixo = num(c.fixoMes) / (num(c.unidMes) || 1);
+  const fixo = num(c.fixoMes) / (num(c.unidMes) || 1) * (num(c.unid) || 1);
   const amort = num(c.vida) ? num(c.maquina) / num(c.vida) * tempo : 0;
   const falhas = num(c.falhas) / 100 * (material + energia + amort) * 0.7;
   const total = material + energia + acess + fixo + amort + falhas;
   const un = total / (num(c.unid) || 1);
   const preco = un * num(c.markup), lojista = preco / 2;
   const bruto = preco - un, brutoL = lojista - un;
-  const liquido = bruto - bruto * (num(c.imposto) + num(c.cartao) + num(c.anuncio)) / 100;
-  const liquidoL = brutoL - brutoL * num(c.imposto) / 100;
+  const liquido = bruto - preco * (num(c.imposto) + num(c.cartao) + num(c.anuncio)) / 100;
+  const liquidoL = brutoL - lojista * num(c.imposto) / 100;
   return { material, energia, acess, fixo, amort, falhas, total, un, preco, lojista, bruto, brutoL, liquido, liquidoL };
 }
 function recalcForm() {
