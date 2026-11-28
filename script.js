@@ -83,7 +83,7 @@ function render() {
     <button class="btn ghost sm" data-a="imp">Importar backup</button>
     <button class="btn ghost sm" data-a="reset">Restaurar catálogo inicial</button>
     
-    <button class="btn ghost sm" data-a="token">Trocar token do GitHub</button>
+    <button class="btn ghost sm" data-a="senha">Cadastrar / alterar senha</button><button class="btn ghost sm" data-a="token">Trocar token do GitHub</button>
     <button class="btn ghost sm" data-a="sair">Sair do modo lojista</button>` : '';
 }
 
@@ -167,6 +167,7 @@ function acaoAdmin(a) {
   else if (a === 'calc') abrirCalculadora();
   else if (a === 'sair') { state.admin = false; adminToken = ''; render(); }
   
+  else if (a === 'senha') cadastrarSenha();
   else if (a === 'token') { state.admin=false; adminToken=''; render(); entrarLojista(); }
   else if (a === 'categoria') {
     const nome = (prompt('Nome da nova categoria:') || '').trim(); if (!nome) return;
@@ -293,7 +294,7 @@ async function publicar(texto) {
 async function salvarTudo() {
   toast('Publicando…');
   try {
-    await publicar(JSON.stringify({ produtos: state.produtos, categorias: state.categorias }));
+    await publicar(JSON.stringify({ produtos: state.produtos, categorias: state.categorias, acesso: state.acesso }));
     toast('Publicado! Aparece para todos em 1 a 2 minutos.');
   } catch (err) { toast('Não publicou: ' + err.message); }
 }
@@ -306,17 +307,53 @@ async function carregar() {
       if (r.ok) dados = await r.json();
     }
     if (!dados) { const r = await fetch('catalogo.json', { cache: 'no-store' }); if (r.ok) dados = await r.json(); }
-    if (dados && Array.isArray(dados.produtos)) { state.produtos = dados.produtos; if (Array.isArray(dados.categorias)) state.categorias = dados.categorias; state.acesso = null; }
+    if (dados && Array.isArray(dados.produtos)) { state.produtos = dados.produtos; if (Array.isArray(dados.categorias)) state.categorias = dados.categorias; state.acesso = dados.acesso || null; }
   } catch { /* sem catalogo.json: usa os produtos iniciais */ }
   state.carregando = false; render();
 }
 
 /* ---------- entrada do lojista ---------- */
+const bytes64 = b => btoa(String.fromCharCode(...b));
+const de64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function chaveSenha(senha,salt) {
+ const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(senha),'PBKDF2',false,['deriveKey']);
+ return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:600000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+function campoSecreto(titulo,duplo=false,alternativa=false) {
+ return new Promise(resolve=>{
+ dlg.innerHTML='<form class="dlg"><h2>'+titulo+'</h2><label for="segredo">Senha ou token</label><input id="segredo" type="password" required autocomplete="off">'+(duplo?'<label for="confirmacao">Confirme a senha</label><input id="confirmacao" type="password" required autocomplete="new-password">':'')+'<button class="btn" type="submit">Confirmar</button>'+(alternativa?'<button type="button" class="btn ghost" id="usarToken">Usar token do GitHub</button>':'')+'<button type="button" class="btn ghost" id="cancelarSegredo">Cancelar</button></form>';
+ const fim=v=>{dlg.removeEventListener('close',cancelar);dlg.close();dlg.innerHTML='';resolve(v);};
+ const cancelar=()=>{dlg.innerHTML='';resolve(null);};
+ dlg.addEventListener('close',cancelar,{once:true});
+ $('#cancelarSegredo').onclick=()=>fim(null);
+ if(alternativa) $('#usarToken').onclick=()=>fim({token:true});
+ dlg.querySelector('form').onsubmit=e=>{e.preventDefault();const v=$('#segredo').value;if(duplo&&(v.length<16||v!==$('#confirmacao').value))return toast('Use pelo menos 16 caracteres e confirme a senha.');fim({valor:v});};
+ if(!dlg.open)dlg.showModal();
+ });
+}
+async function cadastrarSenha(){
+ if(!state.admin||!adminToken)return;
+ const entrada=await campoSecreto('Cadastrar senha',true);if(!entrada)return;
+ const anterior=state.acesso;
+ try{
+ const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+ const key=await chaveSenha(entrada.valor,salt);
+ const cifrado=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(adminToken));
+ state.acesso={v:2,salt:bytes64(salt),iv:bytes64(iv),data:bytes64(new Uint8Array(cifrado))};
+ await publicar(JSON.stringify({produtos:state.produtos,categorias:state.categorias,acesso:state.acesso}));
+ toast('Senha cadastrada!');
+ }catch(e){state.acesso=anterior;toast('Não foi possível cadastrar a senha.');}
+}
 async function entrarLojista() {
   if (state.admin) return toast('Modo lojista já está ativo');
   if (!REPO || state.carregando) return toast('Aguarde o catálogo carregar.');
-  const t = (prompt('Token GitHub restrito a este repositório, com Contents: Read and write:') || '').trim();
-  if (!t) return;
+  let t;
+  if(state.acesso?.v===2){
+   const entrada=await campoSecreto('Área do lojista',false,true);if(!entrada)return;
+   if(!entrada.token){try{const a=state.acesso;const key=await chaveSenha(entrada.valor,de64(a.salt));t=new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:de64(a.iv)},key,de64(a.data)));}catch{return toast('Senha incorreta.');}}
+  }
+  if(!t){const entrada=await campoSecreto('Token do GitHub');if(!entrada)return;t=entrada.valor.trim();}
+  if(!t)return;
   try {
     const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}`, {headers:{Authorization:'Bearer '+t,Accept:'application/vnd.github+json'},cache:'no-store'});
     const d = r.ok ? await r.json() : null;
@@ -325,7 +362,7 @@ async function entrarLojista() {
     if (!data.ok) throw new Error('Não foi possível verificar o catálogo');
     const catalogo=await data.json();
     if(!Array.isArray(catalogo.produtos)) throw new Error('Catálogo inválido');
-    state.produtos=catalogo.produtos;
+    state.produtos=catalogo.produtos; state.acesso=catalogo.acesso||null;
     if(Array.isArray(catalogo.categorias)) state.categorias=catalogo.categorias;
     adminToken=t; state.admin=true; render(); toast('Modo lojista ativado');
   } catch(err) { adminToken=''; state.admin=false; render(); toast('Acesso negado: '+err.message); }
