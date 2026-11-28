@@ -327,7 +327,7 @@ function campoSecreto(titulo,duplo=false,alternativa=false) {
  dlg.addEventListener('close',cancelar,{once:true});
  $('#cancelarSegredo').onclick=()=>fim(null);
  if(alternativa) $('#usarToken').onclick=()=>fim({token:true});
- dlg.querySelector('form').onsubmit=e=>{e.preventDefault();const v=$('#segredo').value;if(duplo&&(v.length<16||v!==$('#confirmacao').value))return toast('Use pelo menos 16 caracteres e confirme a senha.');fim({valor:v});};
+ dlg.querySelector('form').onsubmit=e=>{e.preventDefault();const v=$('#segredo').value;if(duplo&&(v.length<5||v!==$('#confirmacao').value))return toast('Use pelo menos 5 caracteres e confirme a senha.');fim({valor:v});};
  if(!dlg.open)dlg.showModal();
  });
 }
