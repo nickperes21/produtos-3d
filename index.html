@@ -6,12 +6,12 @@
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Catálogo 3D | Chaveiros, decoração e acessórios impressos em 3D</title>
-<meta name="theme-color" content="#101210">
+<meta name="theme-color" content="#f5f7fb">
 <meta name="description" content="Chaveiros, acessórios e decoração impressos em 3D. Escolha cor e acessórios e peça pelo WhatsApp.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <header class="nav">
@@ -21,20 +21,20 @@
     <a href="#como-pedir">Como pedir</a>
     <a href="#contato">Contato</a>
   </nav>
-  <button class="cart-btn" id="btnCart" aria-label="Abrir pedido">Pedido <b id="cartCount">0</b></button>
+  <button class="cart-btn" id="btnCart" aria-label="Abrir pedido">Carrinho <b id="cartCount">0</b></button>
 </header>
 
 <main id="topo">
   <section class="hero">
-    <div class="hero-text">
-      <h1>Impressão 3D feita para você.</h1>
+    <div class="hero-text"><span class="eyebrow">CRIATIVIDADE EM CADA CAMADA</span>
+      <h1>Pequenos detalhes. Grandes ideias.</h1>
       <p>Chaveiros, acessórios e decoração feitos camada por camada. Escolha as variações, monte seu pedido e finalize pelo WhatsApp.</p>
       <div class="hero-cta"><a class="btn" href="#produtos">Ver produtos</a><a class="btn ghost" href="#como-pedir">Como pedir</a></div>
     </div>
-    <div class="layers" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="hero-art" aria-hidden="true"><div class="cube"><i></i><i></i><i></i></div><span>DESIGN • IMPRESSÃO 3D</span></div>
   </section>
 
-  <section class="sec" id="produtos">
+  <div class="benefits"><span>✦ Personalização</span><span>◈ Produção sob encomenda</span><span>✓ Pedido pelo WhatsApp</span></div><section class="sec" id="produtos">
     <div class="sec-head"><h2>Produtos</h2><p id="resultInfo"></p></div>
     <div class="toolbar">
       <input id="search" type="search" placeholder="Buscar produto" aria-label="Buscar produto">
@@ -68,6 +68,6 @@
 
 <dialog id="dlg"></dialog>
 <div class="toast" id="toast" role="status"></div>
-<script defer src="script.js"></script>
+<script defer src="script.js?v=3"></script>
 </body>
 </html>

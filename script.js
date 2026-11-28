@@ -106,7 +106,7 @@ function abrirProduto(id) {
 /* ---------- pedido ---------- */
 function abrirCarrinho() {
   const total = state.carrinho.reduce((s, i) => s + i.preco * (i.qtd || 1), 0);
-  dlg.innerHTML = `<div class="dlg"><h2>Seu pedido</h2>${state.carrinho.length ? state.carrinho.map((i, k) => `<div class="line"><div><b>${esc(i.nome)}</b><span>${esc(i.desc)}</span></div><div><b>${BRL(i.preco * (i.qtd || 1))}</b><br><button class="btn ghost sm" data-qty="${k}" data-delta="-1" aria-label="Diminuir quantidade">−</button> <span style="display:inline">${i.qtd || 1}</span> <button class="btn ghost sm" data-qty="${k}" data-delta="1" aria-label="Aumentar quantidade">+</button><br><button class="btn ghost sm" data-rm="${k}">Remover</button></div></div>`).join('') + `<div class="line"><span>Total</span><span class="total">${BRL(total)}</span></div><button class="btn" data-enviar>Enviar pedido pelo WhatsApp</button>` : '<p class="empty">Seu pedido está vazio. Escolha um produto para começar.</p>'}<button class="btn ghost" data-fechar>Fechar</button></div>`;
+  dlg.innerHTML = `<div class="dlg cart-panel"><h2>Seu carrinho</h2>${state.carrinho.length ? state.carrinho.map((i, k) => `<div class="line"><div><b>${esc(i.nome)}</b><span>${esc(i.desc)}</span></div><div><b>${BRL(i.preco * (i.qtd || 1))}</b><br><button class="btn ghost sm" data-qty="${k}" data-delta="-1" aria-label="Diminuir quantidade">−</button> <span style="display:inline">${i.qtd || 1}</span> <button class="btn ghost sm" data-qty="${k}" data-delta="1" aria-label="Aumentar quantidade">+</button><br><button class="btn ghost sm" data-rm="${k}">Remover</button></div></div>`).join('') + `<div class="line"><span>Total</span><span class="total">${BRL(total)}</span></div><button class="btn" data-enviar>Enviar pedido pelo WhatsApp</button>` : '<p class="empty">Seu pedido está vazio. Escolha um produto para começar.</p>'}<button class="btn ghost" data-fechar>Fechar</button></div>`;
   if (!dlg.open) dlg.showModal();
 }
 function enviar() {
@@ -148,7 +148,7 @@ function desenharFotos() {
 function reduzir(file) { // reduz a foto para caber no armazenamento
   return new Promise((ok, erro) => { const r = new FileReader(); r.onerror = erro; r.onload = () => { const im = new Image(); im.onerror = erro; im.onload = () => {
     const s = Math.min(1, 560 / Math.max(im.width, im.height)), c = document.createElement('canvas');
-    c.width = im.width * s; c.height = im.height * s; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/jpeg', .78)); };
+    c.width = im.width * s; c.height = im.height * s; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); ok(c.toDataURL('image/webp', .82)); };
     im.src = r.result; }; r.readAsDataURL(file); });
 }
 function salvarProduto() {
