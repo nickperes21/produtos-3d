@@ -33,7 +33,7 @@ const state = {
   produtos: structuredClone(PADRAO),
   categorias: [...CATEGORIAS], carregando: true, acesso: null,
   carrinho: load('c3d_carrinho', []),
-  calculos: load('c3d_calculos2', []), calcPadrao: load('c3d_calcpadrao', {}), calcAtual: '',
+  calculos: load('c3d_calculos2', []), calcPadrao: { ...load('c3d_calcpadrao', {}), ...(!load('c3d_defaults_20261127', false) ? { potencia: 150, kwh: 0.93, vida: 20000, maquina: 2200, falhas: 20 } : {}) }, calcAtual: '',
   admin: false,
   cat: 'Todos', busca: '', ordem: 'def', atual: null, sel: [], fotosForm: []
 };
@@ -276,7 +276,7 @@ function salvarCalculo() {
   const ex = state.calculos.find(x => x.id === c.id) || state.calculos.find(x => x.nome.toLowerCase() === c.nome.toLowerCase());
   if (ex) Object.assign(ex, c, { id: ex.id }); else { c.id = 'c' + Date.now().toString(36); state.calculos.push(c); }
   state.calcPadrao = Object.fromEntries(PADROES.map(k => [k, c[k]]));
-  save('c3d_calculos2', state.calculos); save('c3d_calcpadrao', state.calcPadrao);
+  save('c3d_calculos2', state.calculos); save('c3d_calcpadrao', state.calcPadrao); save('c3d_defaults_20261127', true);
   abrirCalculadora(); toast('Cálculo salvo');
 }
 
