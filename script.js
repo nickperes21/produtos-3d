@@ -27,12 +27,13 @@ const normalizar = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,''
 const load = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { toast('Sem espaço para salvar. Use menos fotos ou fotos menores.'); } };
 
+localStorage.removeItem('c3d_token'); // remove credencial persistente legada
 const state = {
   produtos: structuredClone(PADRAO),
   categorias: [...CATEGORIAS], carregando: true, acesso: null,
   carrinho: load('c3d_carrinho', []),
   calculos: load('c3d_calculos2', []), calcPadrao: load('c3d_calcpadrao', {}), calcAtual: '',
-  admin: sessionStorage.getItem('c3d_admin') === '1',
+  admin: sessionStorage.getItem('c3d_admin') === '1' && !!sessionStorage.getItem('c3d_token'),
   cat: 'Todos', busca: '', ordem: 'def', atual: null, sel: [], fotosForm: []
 };
 const dlg = $('#dlg');
@@ -80,7 +81,7 @@ function render() {
     <button class="btn ghost sm" data-a="exp">Exportar backup</button>
     <button class="btn ghost sm" data-a="imp">Importar backup</button>
     <button class="btn ghost sm" data-a="reset">Restaurar catálogo inicial</button>
-    <button class="btn ghost sm" data-a="senha">Definir senha</button>
+    
     <button class="btn ghost sm" data-a="token">Trocar token do GitHub</button>
     <button class="btn ghost sm" data-a="sair">Sair do modo lojista</button>` : '';
 }
@@ -163,9 +164,9 @@ function salvarProduto() {
 function acaoAdmin(a) {
   if (a === 'novo') formProduto();
   else if (a === 'calc') abrirCalculadora();
-  else if (a === 'sair') { state.admin = false; sessionStorage.removeItem('c3d_admin'); localStorage.removeItem('c3d_token'); render(); }
-  else if (a === 'senha') definirSenha();
-  else if (a === 'token') { localStorage.removeItem('c3d_token'); pegarToken(); }
+  else if (a === 'sair') { state.admin = false; sessionStorage.removeItem('c3d_admin'); sessionStorage.removeItem('c3d_token'); render(); }
+  else if (a === 'senha') toast('Use um token restrito ao repositório.');
+  else if (a === 'token') { sessionStorage.removeItem('c3d_token'); pegarToken(); }
   else if (a === 'categoria') {
     const nome = (prompt('Nome da nova categoria:') || '').trim(); if (!nome) return;
     if (state.categorias.some(c => c.toLowerCase() === nome.toLowerCase())) return toast('Essa categoria já existe.');
@@ -277,10 +278,10 @@ function salvarCalculo() {
 /* ---------- publicar para todos os dispositivos (GitHub) ---------- */
 const b64 = s => { const b = new TextEncoder().encode(s); let bin = ''; for (let i = 0; i < b.length; i += 0x8000) bin += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(bin); };
 function pegarToken() {
-  let t = localStorage.getItem('c3d_token');
+  let t = sessionStorage.getItem('c3d_token');
   if (!t) {
-    t = (prompt('Cole o token do GitHub (ele fica guardado só neste aparelho):') || '').trim();
-    if (t) localStorage.setItem('c3d_token', t);
+    t = (prompt('Cole o token do GitHub (ele fica guardado apenas nesta sessão):') || '').trim();
+    if (t) sessionStorage.setItem('c3d_token', t);
   }
   return t;
 }
@@ -289,7 +290,7 @@ async function publicar(texto) {
   const t = pegarToken(); if (!t) throw new Error('sem token');
   const url = `https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/catalogo.json`;
   const h = { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github+json' };
-  const falha = r => { if ([401, 403, 404].includes(r.status)) localStorage.removeItem('c3d_token'); return new Error('GitHub respondeu ' + r.status + ' (confira o token)'); };
+  const falha = r => { if ([401, 403, 404].includes(r.status)) sessionStorage.removeItem('c3d_token'); return new Error('GitHub respondeu ' + r.status + ' (confira o token)'); };
   let sha;
   const g = await fetch(url + '?ref=' + BRANCH, { headers: h, cache: 'no-store' });
   if (g.ok) sha = (await g.json()).sha; else if (g.status !== 404) throw falha(g);
@@ -299,20 +300,20 @@ async function publicar(texto) {
 async function salvarTudo() {
   toast('Publicando…');
   try {
-    await publicar(JSON.stringify({ produtos: state.produtos, categorias: state.categorias, acesso: state.acesso }));
+    await publicar(JSON.stringify({ produtos: state.produtos, categorias: state.categorias }));
     toast('Publicado! Aparece para todos em 1 a 2 minutos.');
   } catch (err) { toast('Não publicou: ' + err.message); }
 }
 async function carregar() {
   try {
     let dados = null;
-    const t = localStorage.getItem('c3d_token');
+    const t = sessionStorage.getItem('c3d_token');
     if (t && REPO) { // lojista: lê a versão mais recente direto do GitHub
       const r = await fetch(`https://api.github.com/repos/${REPO.owner}/${REPO.repo}/contents/catalogo.json?ref=${BRANCH}`, { headers: { Authorization: 'Bearer ' + t, Accept: 'application/vnd.github.raw+json' }, cache: 'no-store' });
       if (r.ok) dados = await r.json();
     }
     if (!dados) { const r = await fetch('catalogo.json', { cache: 'no-store' }); if (r.ok) dados = await r.json(); }
-    if (dados && Array.isArray(dados.produtos)) { state.produtos = dados.produtos; if (Array.isArray(dados.categorias)) state.categorias = dados.categorias; state.acesso = dados.acesso || null; }
+    if (dados && Array.isArray(dados.produtos)) { state.produtos = dados.produtos; if (Array.isArray(dados.categorias)) state.categorias = dados.categorias; state.acesso = null; }
   } catch { /* sem catalogo.json: usa os produtos iniciais */ }
   state.carregando = false; render();
 }
@@ -338,7 +339,7 @@ async function entrarLojista() {
   if (state.admin) return toast('Modo lojista já está ativo');
   if (!REPO) return toast('Repositório não encontrado (veja REPO_MANUAL).');
   if (state.carregando) return toast('Aguarde o catálogo carregar.');
-  let t = localStorage.getItem('c3d_token');
+  let t = sessionStorage.getItem('c3d_token');
   if (!t && state.acesso) {
     const senha = prompt('Senha do lojista (ou deixe em branco para colar um token novo do GitHub):');
     if (senha === null) return;
@@ -355,10 +356,10 @@ async function entrarLojista() {
     st = r.status;
     const d = r.ok ? await r.json() : null;
     if (!d || (d.permissions && !d.permissions.push)) throw 0;
-    localStorage.setItem('c3d_token', t);
+    sessionStorage.setItem('c3d_token', t);
     state.admin = true; sessionStorage.setItem('c3d_admin', '1'); render(); toast('Modo lojista ativado'); $('#produtos').scrollIntoView();
   } catch {
-    localStorage.removeItem('c3d_token');
+    sessionStorage.removeItem('c3d_token');
     toast(st === 401 ? 'Token inválido ou expirado (erro 401).'
       : st === 404 ? `Este token não enxerga o repositório "${REPO.owner}/${REPO.repo}" (erro 404).`
       : st === 200 ? 'Este token não tem permissão para editar.'
@@ -366,7 +367,7 @@ async function entrarLojista() {
   }
 }
 async function definirSenha() {
-  const t = localStorage.getItem('c3d_token'); if (!t) return toast('Entre com o token primeiro.');
+  const t = sessionStorage.getItem('c3d_token'); if (!t) return toast('Entre com o token primeiro.');
   const s1 = prompt('Crie a senha do lojista (use 4 palavras ou 12+ caracteres):'); if (!s1) return;
   if (s1.length < 10) return toast('Senha curta demais: use pelo menos 10 caracteres.');
   if (prompt('Digite a senha de novo para confirmar:') !== s1) return toast('As senhas não conferem.');
