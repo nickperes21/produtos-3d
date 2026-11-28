@@ -112,3 +112,13 @@ label{display:block;font-size:13px;color:var(--mu);margin-bottom:5px}
 .calc-sec{font-size:15px;color:var(--ac);margin:6px 0 0}
 .calc-out b{font-size:15px}
 .ac-row{display:grid;grid-template-columns:1.5fr .6fr .8fr auto;gap:6px}
+
+/* Refinamentos de responsividade e acessibilidade */
+[hidden]{display:none!important}
+.card{min-width:0;box-shadow:0 6px 20px #0002}
+.cbody h3{overflow-wrap:anywhere}
+.hero h1{max-width:18ch}
+button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:560px){.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.cbody{padding:10px}.cbody h3{font-size:15px}.cfoot{flex-wrap:wrap}.cfoot .btn{width:100%;text-align:center;min-height:40px}.price{font-size:18px}.hero{gap:20px;padding-top:32px;padding-bottom:24px}.layers{display:none}.dlg .big{height:240px}.dlg{padding:14px}.calc-out{grid-template-columns:repeat(2,minmax(0,1fr))}.row{flex-wrap:wrap}.toast{width:max-content;max-width:92vw;text-align:center}.cadmin{flex-wrap:wrap;padding:0 10px 10px}}
+@media(max-width:340px){.grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
