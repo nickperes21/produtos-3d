@@ -64,12 +64,12 @@ function render() {
   $('#resultInfo').textContent = lista.length + (lista.length === 1 ? ' produto' : ' produtos');
   $('#grid').innerHTML = lista.length ? lista.map(p => `
     <article class="card">${thumb(p, 'thumb')}
-      <div class="cbody"><span class="cat">${esc(p.cat)}${p.cat2 ? ' • ' + esc(p.cat2) : ''}</span><h3>${esc(p.nome)}</h3>
+      <div class="cbody"><span class="cat">${esc(p.cat)}${p.cat2 ? ' • ' + esc(p.cat2) : ''}</span><h3>${esc(p.nome)}</h3><span class="cat">${p.disponibilidade === 'esgotado' ? 'Esgotado' : p.disponibilidade === 'pronta' ? 'Pronta entrega' : 'Sob encomenda'}</span>
         <div class="cfoot"><span class="price">${temExtra(p) ? '<small>a partir de</small>' : ''}${BRL(p.preco)}</span>
         <button class="btn sm" data-abrir="${esc(p.id)}">Escolher</button></div></div>
       ${state.admin ? `<div class="cadmin"><button class="btn ghost sm" data-editar="${esc(p.id)}">Editar</button><button class="btn danger sm" data-excluir="${esc(p.id)}">Excluir</button></div>` : ''}
     </article>`).join('') : `<p class="empty">${state.carregando ? 'Carregando produtos…' : 'Nenhum produto encontrado. Tente outra busca.'}</p>`;
-  $('#cartCount').textContent = state.carrinho.length;
+  $('#cartCount').textContent = state.carrinho.reduce((n,i)=>n+(i.qtd||1),0);
   $('#waLink').href = 'https://wa.me/' + WHATSAPP;
   const bar = $('#adminBar'); bar.hidden = !state.admin;
   bar.innerHTML = state.admin ? `
@@ -94,22 +94,22 @@ function abrirProduto(id) {
   dlg.innerHTML = `<div class="dlg">
     <div class="big" id="foto" style="background-color:${esc(p.cor)};${capa(p) ? `background-image:url('${esc(capa(p))}')` : ''}">${capa(p) ? '' : esc(p.emoji)}</div>
     ${fotos.length > 1 ? `<div class="miniaturas">${fotos.map((f, i) => `<button class="mini" data-foto="${i}" style="background-image:url('${esc(f.src)}')" aria-label="Foto ${i + 1}"></button>`).join('')}</div>` : ''}
-    <h2>${esc(p.nome)}</h2>
+    <h2>${esc(p.nome)}</h2>${p.descricao ? `<p>${esc(p.descricao)}</p>` : ''}<span class="cat">${p.disponibilidade === 'esgotado' ? 'Esgotado' : p.disponibilidade === 'pronta' ? 'Pronta entrega' : 'Sob encomenda'}</span>
     ${p.variacoes.map((g, i) => `<div class="grp"><b>${esc(g.nome)}</b><div class="opts">${g.valores.map((v, j) => `<button class="opt" aria-pressed="${j === 0}" data-g="${i}" data-v="${j}">${CORES[v.nome.toLowerCase()] ? `<span class="dot" style="background:${CORES[v.nome.toLowerCase()]}"></span>` : ''}${esc(v.nome)}</button>`).join('')}</div></div>`).join('')}
     <div><label for="obs">Observações (nome, texto, logo)</label><textarea id="obs" rows="2" placeholder="Opcional"></textarea></div>
-    <div class="row"><span class="price" id="pAtual">${BRL(precoAtual())}</span><button class="btn" data-add>Adicionar ao pedido</button><button class="btn ghost" data-fechar>Fechar</button></div></div>`;
+    <div class="row"><span class="price" id="pAtual">${BRL(precoAtual())}</span><button class="btn" data-add ${p.disponibilidade === 'esgotado' ? 'disabled' : ''}>Adicionar ao pedido</button><button class="btn ghost" data-fechar>Fechar</button></div></div>`;
   dlg.showModal();
 }
 
 /* ---------- pedido ---------- */
 function abrirCarrinho() {
-  const total = state.carrinho.reduce((s, i) => s + i.preco, 0);
-  dlg.innerHTML = `<div class="dlg"><h2>Seu pedido</h2>${state.carrinho.length ? state.carrinho.map((i, k) => `<div class="line"><div><b>${esc(i.nome)}</b><span>${esc(i.desc)}</span></div><div><b>${BRL(i.preco)}</b><br><button class="btn ghost sm" data-rm="${k}">Remover</button></div></div>`).join('') + `<div class="line"><span>Total</span><span class="total">${BRL(total)}</span></div><button class="btn" data-enviar>Enviar pedido pelo WhatsApp</button>` : '<p class="empty">Seu pedido está vazio. Escolha um produto para começar.</p>'}<button class="btn ghost" data-fechar>Fechar</button></div>`;
+  const total = state.carrinho.reduce((s, i) => s + i.preco * (i.qtd || 1), 0);
+  dlg.innerHTML = `<div class="dlg"><h2>Seu pedido</h2>${state.carrinho.length ? state.carrinho.map((i, k) => `<div class="line"><div><b>${esc(i.nome)}</b><span>${esc(i.desc)}</span></div><div><b>${BRL(i.preco * (i.qtd || 1))}</b><br><button class="btn ghost sm" data-qty="${k}" data-delta="-1" aria-label="Diminuir quantidade">−</button> <span style="display:inline">${i.qtd || 1}</span> <button class="btn ghost sm" data-qty="${k}" data-delta="1" aria-label="Aumentar quantidade">+</button><br><button class="btn ghost sm" data-rm="${k}">Remover</button></div></div>`).join('') + `<div class="line"><span>Total</span><span class="total">${BRL(total)}</span></div><button class="btn" data-enviar>Enviar pedido pelo WhatsApp</button>` : '<p class="empty">Seu pedido está vazio. Escolha um produto para começar.</p>'}<button class="btn ghost" data-fechar>Fechar</button></div>`;
   if (!dlg.open) dlg.showModal();
 }
 function enviar() {
-  const total = state.carrinho.reduce((s, i) => s + i.preco, 0);
-  const msg = 'Olá! Quero fazer este pedido:\n\n' + state.carrinho.map(i => `• ${i.nome} (${i.desc}): ${BRL(i.preco)}`).join('\n') + `\n\nTotal: ${BRL(total)}`;
+  const total = state.carrinho.reduce((s, i) => s + i.preco * (i.qtd || 1), 0);
+  const msg = 'Olá! Quero fazer este pedido:\n\n' + state.carrinho.map(i => `• ${i.qtd || 1} × ${i.nome} (${i.desc}): ${BRL(i.preco * (i.qtd || 1))}`).join('\n') + `\n\nTotal: ${BRL(total)}`;
   window.open('https://wa.me/' + WHATSAPP + '?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
 }
 
@@ -124,7 +124,7 @@ function formProduto(p) {
   state.fotosForm = structuredClone(fotosDe(p));
   const cats = [...new Set([...state.categorias, ...state.produtos.map(x => x.cat)])];
   dlg.innerHTML = `<div class="dlg"><h2>${novo ? 'Novo produto' : 'Editar produto'}</h2>
-    <div><label>Nome</label><input id="fNome" value="${esc(p.nome)}"></div>
+    <div><label>Nome</label><input id="fNome" value="${esc(p.nome)}"></div><div><label>Descrição</label><textarea id="fDesc" rows="3">${esc(p.descricao || '')}</textarea></div><div><label>Disponibilidade</label><select id="fDisp">${[['encomenda','Sob encomenda'],['pronta','Pronta entrega'],['esgotado','Esgotado']].map(([v,n])=>`<option value="${v}" ${v===(p.disponibilidade||'encomenda')?'selected':''}>${n}</option>`).join('')}</select></div>
     <div class="row"><div style="flex:1"><label>Categoria</label><select id="fCat">${cats.map(c => `<option ${c === p.cat ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
     <div style="flex:1"><label>Categoria 2 (opcional)</label><select id="fCat2"><option value="">— nenhuma —</option>${cats.map(c => `<option ${c === p.cat2 ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div></div>
     <div><label>Preencher com um cálculo salvo na calculadora</label><select id="fCalc"><option value="">— escolher —</option>${state.calculos.map(c => `<option value="${esc(c.id)}">${esc(c.nome)}</option>`).join('')}</select></div>
@@ -152,7 +152,7 @@ function reduzir(file) { // reduz a foto para caber no armazenamento
 function salvarProduto() {
   const nome = $('#fNome').value.trim(); if (!nome) return toast('Informe o nome do produto.');
   if (!$('#fPreco').value || !Number.isFinite(Number($('#fPreco').value)) || Number($('#fPreco').value)<0) return toast('Informe um preço válido.');
-  const p = { ...state.atual, nome, cat: $('#fCat').value, cat2: $('#fCat2').value === $('#fCat').value ? '' : $('#fCat2').value, preco: parseFloat($('#fPreco').value) || 0, emoji: $('#fEmoji').value || '📦', cor: $('#fCor').value, variacoes: varParse($('#fVar').value), fotos: state.fotosForm };
+  const p = { ...state.atual, nome, descricao: $('#fDesc').value.trim(), disponibilidade: $('#fDisp').value, cat: $('#fCat').value, cat2: $('#fCat2').value === $('#fCat').value ? '' : $('#fCat2').value, preco: parseFloat($('#fPreco').value) || 0, emoji: $('#fEmoji').value || '📦', cor: $('#fCor').value, variacoes: varParse($('#fVar').value), fotos: state.fotosForm };
   delete p.img;
   if (p.id) state.produtos = state.produtos.map(x => x.id === p.id ? p : x);
   else { p.id = 'p' + Date.now().toString(36); state.produtos.push(p); }
@@ -394,10 +394,12 @@ document.addEventListener('click', e => {
     if (f) mostrarFoto(f.src);
   }
   else if (q('data-add')) {
+    if(state.atual.disponibilidade === 'esgotado') return toast('Produto esgotado.');
     const p = state.atual, desc = p.variacoes.map((g, i) => g.nome + ': ' + g.valores[state.sel[i]].nome).join(', '), obs = $('#obs').value.trim();
-    state.carrinho.push({ nome: p.nome, desc: desc + (obs ? (desc ? ' | ' : '') + 'Obs: ' + obs : ''), preco: precoAtual() });
+    const detalhe = desc + (obs ? (desc ? ' | ' : '') + 'Obs: ' + obs : ''); const igual=state.carrinho.find(i=>i.id===p.id && i.desc===detalhe && i.preco===precoAtual()); if(igual) igual.qtd=(igual.qtd||1)+1; else state.carrinho.push({id:p.id,nome:p.nome,desc:detalhe,preco:precoAtual(),qtd:1});
     save('c3d_carrinho', state.carrinho); dlg.close(); render(); toast('Adicionado ao pedido');
   }
+  else if (q('data-qty')) { const i=state.carrinho[+d('data-qty')]; if(i){i.qtd=Math.max(1,Math.min(999,(i.qtd||1)+Number(d('data-delta'))));save('c3d_carrinho',state.carrinho);render();abrirCarrinho();} }
   else if (q('data-rm')) { state.carrinho.splice(+d('data-rm'), 1); save('c3d_carrinho', state.carrinho); render(); abrirCarrinho(); }
   else if (q('data-enviar')) enviar();
   else if (q('data-editar')) formProduto(state.produtos.find(p => p.id === d('data-editar')));
